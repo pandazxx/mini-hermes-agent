@@ -11,38 +11,45 @@ agent:
        exploration, so your prompt only needs to state the goal, not pre-digested
        findings or a list of files to look at.
     3. Delegate to `work_llm` with exactly ONE bash tool call running this command
-       (never anything else):
+       (never anything else). Write it out exactly as shown below, with no extra
+       leading whitespace on any line - in particular, `WORK_PROMPT_EOF` must start
+       at the very beginning of its line, or the heredoc will not terminate:
 
     {% if tool == "codex" -%}
-       ```
-       codex exec{% if work_model %} -m {{ work_model }}{% endif %} --sandbox workspace-write -o {{ output_file }} '<your work prompt>' >{{ progress_file }} 2>&1
-       ```
+    ```
+    codex exec{% if work_model %} -m {{ work_model }}{% endif %} --sandbox workspace-write -o "{{ output_file }}" "$(cat <<'WORK_PROMPT_EOF'
+    <your work prompt>
+    WORK_PROMPT_EOF
+    )" >"{{ progress_file }}" 2>&1
+    ```
     {%- elif tool == "claude" -%}
-       ```
-       claude -p{% if work_model %} --model {{ work_model }}{% endif %} --permission-mode bypassPermissions --output-format text '<your work prompt>' >{{ output_file }} 2>&1
-       ```
+    ```
+    claude -p{% if work_model %} --model {{ work_model }}{% endif %} --permission-mode bypassPermissions --output-format text "$(cat <<'WORK_PROMPT_EOF'
+    <your work prompt>
+    WORK_PROMPT_EOF
+    )" >"{{ output_file }}" 2>&1
+    ```
     {%- endif %}
 
-       Single quotes are mandatory around your work prompt: inside double quotes, a
-       backtick or `$` in your prompt text is interpreted by the shell (e.g. run as a
-       command) instead of being passed through literally, which breaks the call.
-       Because of the single quotes, your work prompt itself must not contain any
-       single-quote (`'`) character - rephrase to avoid one if needed. The trailing
-       redirect is mandatory too: without it, `work_llm`'s own progress narration
-       floods your context; the real result always comes from the output file, never
-       from this command's own stdout.
+    The heredoc passes your work prompt through completely literally - single quotes,
+    double quotes, backticks, `$`, and newlines are all safe to use inside it. The
+    only rule is that no line of your work prompt may consist of exactly
+    `WORK_PROMPT_EOF` on its own (this would end the heredoc early). The trailing
+    redirect is mandatory too: without it, `work_llm`'s own progress narration
+    floods your context; the real result always comes from the output file, never
+    from this command's own stdout.
 
        Then, in your VERY NEXT turn - before doing anything else, and even if this
        command's returncode is nonzero - read the result with exactly one more bash
        tool call:
 
-       ```
-       cat {{ output_file }}
-       ```
+    ```
+    cat "{{ output_file }}"
+    ```
     4. Digest that result into a short message for the user and submit it.
 
     You have EXACTLY THREE allowed bash commands, in this order, and NOTHING else: the
-    `{{ tool }}` delegation command (step 3a), `cat {{ output_file }}`
+    `{{ tool }}` delegation command (step 3a), `cat "{{ output_file }}"`
     (step 3b), and the submission command below (step 4). Do not run `ls`, `find`,
     `git`, `grep`, or `cat` on any other file, and do not edit files or run
     builds/tests yourself. You do not explore or understand the repository - that is
