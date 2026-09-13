@@ -1,7 +1,7 @@
-"""Delegate a task to `codex` or `claude` (Claude Code) instead of solving it directly.
+"""hermes: delegate a task to `codex` or `claude` (Claude Code) instead of solving it directly.
 
 The agent interprets the task, composes a work prompt for the chosen CLI, and runs
-it as a single bash action - see config/extra/delegate.yaml for the system prompt
+it as a single bash action - see config/extra/hermes.yaml for the system prompt
 that enforces this and forbids the agent from doing the work itself.
 """
 
@@ -17,8 +17,8 @@ from minisweagent.environments import get_environment
 from minisweagent.models import get_model
 from minisweagent.utils.serialize import UNSET, recursive_merge
 
-DEFAULT_CONFIG_FILE = builtin_config_dir / "extra" / "delegate.yaml"
-DEFAULT_OUTPUT_FILE = global_config_dir / "last_delegate_run.traj.json"
+DEFAULT_CONFIG_FILE = builtin_config_dir / "extra" / "hermes.yaml"
+DEFAULT_OUTPUT_FILE = global_config_dir / "last_hermes_run.traj.json"
 TOOLS = ("codex", "claude")
 
 app = typer.Typer(add_completion=False)

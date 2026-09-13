@@ -9,4 +9,4 @@
 
 ## Extras
 
-* `extra/delegate.yaml` - Config for the `run/extra/delegate.py` entry point.
+* `extra/hermes.yaml` - Config for the `run/extra/hermes.py` entry point.

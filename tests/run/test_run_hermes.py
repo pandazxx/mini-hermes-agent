@@ -5,7 +5,7 @@ import pytest
 import typer
 
 from minisweagent.models.test_models import DeterministicToolcallModel, make_toolcall_output
-from minisweagent.run.extra.delegate import DEFAULT_CONFIG_FILE, main
+from minisweagent.run.extra.hermes import DEFAULT_CONFIG_FILE, main
 
 
 def _make_tc_model(outputs_spec: list[tuple[str, list[dict]]]) -> DeterministicToolcallModel:
@@ -27,12 +27,12 @@ def _make_tc_model(outputs_spec: list[tuple[str, list[dict]]]) -> DeterministicT
     return DeterministicToolcallModel(outputs=outputs)
 
 
-def _run_delegate(tool: str, work_model: str, task: str, output) -> dict:
+def _run_hermes(tool: str, work_model: str, task: str, output) -> dict:
     model = _make_tc_model(
         [
             (
                 "Delegating to work_llm.",
-                [{"command": "printf 'work_llm did the thing' > /tmp/mswea_delegate_output.txt"}],
+                [{"command": "printf 'work_llm did the thing' > /tmp/mswea_hermes_output.txt"}],
             ),
             (
                 "Digesting the result.",
@@ -40,7 +40,7 @@ def _run_delegate(tool: str, work_model: str, task: str, output) -> dict:
             ),
         ]
     )
-    with patch("minisweagent.run.extra.delegate.get_model", return_value=model):
+    with patch("minisweagent.run.extra.hermes.get_model", return_value=model):
         return main(
             task=task,
             tool=tool,
@@ -53,15 +53,15 @@ def _run_delegate(tool: str, work_model: str, task: str, output) -> dict:
 
 
 @pytest.mark.parametrize(("tool"), ["codex", "claude"])
-def test_delegate_end_to_end_submits_digest(tmp_path, tool):
-    result = _run_delegate(tool, "", "fix the flaky test", tmp_path / "traj.json")
+def test_hermes_end_to_end_submits_digest(tmp_path, tool):
+    result = _run_hermes(tool, "", "fix the flaky test", tmp_path / "traj.json")
     assert result["exit_status"] == "Submitted"
     assert "work_llm did the thing" in result["submission"]
 
 
-def test_delegate_renders_the_chosen_tool_into_the_first_messages(tmp_path):
+def test_hermes_renders_the_chosen_tool_into_the_first_messages(tmp_path):
     output = tmp_path / "traj.json"
-    _run_delegate("claude", "opus", "do the thing", output)
+    _run_hermes("claude", "opus", "do the thing", output)
 
     messages = json.loads(output.read_text())["messages"]
     system_message, instance_message = messages[0], messages[1]
@@ -71,7 +71,7 @@ def test_delegate_renders_the_chosen_tool_into_the_first_messages(tmp_path):
     assert "do the thing" in instance_message["content"]
 
 
-def test_delegate_rejects_unknown_tool(tmp_path):
+def test_hermes_rejects_unknown_tool(tmp_path):
     with pytest.raises(typer.BadParameter):
         main(
             task="do the thing",
