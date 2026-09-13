@@ -6,3 +6,7 @@
 ## Benchmarks
 
 * `benchmarks/swebench.yaml` - Config for the `run/benchmarks/swebench.py` entry point.
+
+## Extras
+
+* `extra/delegate.yaml` - Config for the `run/extra/delegate.py` entry point.

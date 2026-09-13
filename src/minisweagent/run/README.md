@@ -8,3 +8,4 @@
 ## Extras
 
 * `extra/swebench.py` - Benchmark the performance of the `default.py` agent.
+* `extra/delegate.py` - Delegate a task to `codex` or `claude` (Claude Code) instead of solving it directly.
