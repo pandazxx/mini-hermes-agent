@@ -1,5 +1,3 @@
-set dotenv-load := true
-
 # List available recipes
 default:
     @just --list
