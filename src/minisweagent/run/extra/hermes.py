@@ -1,12 +1,15 @@
 """hermes: delegate a task to `codex` or `claude` (Claude Code) instead of solving it directly.
 
-The agent interprets the task, composes a work prompt for the chosen CLI, and runs
-it as a single bash action - see config/extra/hermes.yaml for the system prompt
-that enforces this and forbids the agent from doing the work itself. Every run gets
-a unique task id and a traceable output directory (see minisweagent.utils.traceable)
-holding the task's basic info, its own trajectory, and work_llm's raw output.
+The agent interprets the task, composes a work prompt for the chosen CLI, and delegates
+it via the `delegate_work` tool; the harness builds and runs the actual command. After
+each round the user accepts the work or rejects it with a reason, in which case the
+workspace is reset to the starting commit and the agent delegates a revised prompt - see
+minisweagent/agents/extra/hermes.py and config/extra/hermes.yaml. Every run gets a unique
+task id and a traceable output directory (see minisweagent.utils.traceable) holding the
+task's basic info, its own trajectory, per-round records, and work_llm's raw output.
 """
 
+import json
 import os
 from pathlib import Path
 
@@ -14,6 +17,7 @@ import typer
 
 from minisweagent import global_config_dir
 from minisweagent.agents import get_agent
+from minisweagent.agents.extra.hermes import DELEGATE_WORK_TOOL
 from minisweagent.config import builtin_config_dir, get_config_from_spec
 from minisweagent.environments import get_environment
 from minisweagent.models import get_model
@@ -64,7 +68,7 @@ def main(
                 "cost_limit": cost_limit if cost_limit is not None else UNSET,
                 "output_path": trace.trajectory_path,
             },
-            "model": {"model_name": model_name or UNSET},
+            "model": {"model_name": model_name or UNSET, "extra_tools": [DELEGATE_WORK_TOOL]},
         }
     )
     config = recursive_merge(*configs)
@@ -82,7 +86,9 @@ def main(
         work_llm_output_file=str(trace.path("work_llm_output.txt")),
         work_llm_progress_file=str(trace.path("work_llm_progress.log")),
     )
+    result |= {"start_commit": agent.start_commit, "accepted_commit": agent.accepted_commit, "rounds": agent.rounds}
     trace.record_result(result)
+    trace.path("rounds.json").write_text(json.dumps(agent.rounds, indent=2))
     if output:
         agent.save(output)
     print(result.get("submission") or f"(no submission; exit_status={result.get('exit_status')})")

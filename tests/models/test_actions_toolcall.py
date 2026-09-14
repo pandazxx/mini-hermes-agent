@@ -42,7 +42,7 @@ class TestParseToolcallActions:
         tool_call.function.arguments = '{"command": "echo hello"}'
         tool_call.id = "call_123"
         assert parse_toolcall_actions([tool_call], format_error_template="{{ error }}") == [
-            {"command": "echo hello", "tool_call_id": "call_123"}
+            {"name": "bash", "command": "echo hello", "tool_call_id": "call_123"}
         ]
 
     def test_multiple_valid_tool_calls(self):
@@ -55,8 +55,8 @@ class TestParseToolcallActions:
             calls.append(tc)
         result = parse_toolcall_actions(calls, format_error_template="{{ error }}")
         assert len(result) == 3
-        assert result[0] == {"command": "cmd0", "tool_call_id": "call_0"}
-        assert result[2] == {"command": "cmd2", "tool_call_id": "call_2"}
+        assert result[0] == {"name": "bash", "command": "cmd0", "tool_call_id": "call_0"}
+        assert result[2] == {"name": "bash", "command": "cmd2", "tool_call_id": "call_2"}
 
     def test_unknown_tool_raises_format_error(self):
         tool_call = MagicMock()
@@ -84,6 +84,29 @@ class TestParseToolcallActions:
         with pytest.raises(FormatError) as exc_info:
             parse_toolcall_actions([tool_call], format_error_template="{{ error }}")
         assert "Missing 'command' argument" in exc_info.value.messages[0]["content"]
+
+    def test_extra_tool_call_parses_with_all_args_and_name(self):
+        deploy = {"type": "function", "function": {"name": "deploy", "parameters": {"required": ["env"]}}}
+        tool_call = MagicMock()
+        tool_call.function.name = "deploy"
+        tool_call.function.arguments = '{"env": "prod", "dry_run": true}'
+        tool_call.id = "call_1"
+        assert parse_toolcall_actions([tool_call], format_error_template="{{ error }}", tools=[BASH_TOOL, deploy]) == [
+            {"name": "deploy", "env": "prod", "dry_run": True, "tool_call_id": "call_1"}
+        ]
+        with pytest.raises(FormatError) as exc_info:
+            parse_toolcall_actions([tool_call], format_error_template="{{ error }}")
+        assert "Unknown tool 'deploy'" in exc_info.value.messages[0]["content"]
+
+    def test_extra_tool_call_missing_required_arg_raises_format_error(self):
+        deploy = {"type": "function", "function": {"name": "deploy", "parameters": {"required": ["env"]}}}
+        tool_call = MagicMock()
+        tool_call.function.name = "deploy"
+        tool_call.function.arguments = '{"dry_run": true}'
+        tool_call.id = "call_1"
+        with pytest.raises(FormatError) as exc_info:
+            parse_toolcall_actions([tool_call], format_error_template="{{ error }}", tools=[BASH_TOOL, deploy])
+        assert "Missing 'env' argument in deploy tool call" in exc_info.value.messages[0]["content"]
 
 
 class TestFormatToolcallObservationMessages:

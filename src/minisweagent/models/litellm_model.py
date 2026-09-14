@@ -33,6 +33,8 @@ class LitellmModelConfig(BaseModel):
     """Model registry for cost tracking and model metadata. See the local model guide (https://mini-swe-agent.com/latest/models/local_models/) for more details."""
     set_cache_control: Literal["default_end"] | None = None
     """Set explicit cache control markers, for example for Anthropic models"""
+    extra_tools: list[dict[str, Any]] = []
+    """Additional tool definitions offered to the model besides the bash tool."""
     cost_tracking: Literal["default", "ignore_errors"] = os.getenv("MSWEA_COST_TRACKING", "default")
     """Cost tracking mode for this model. Can be "default" or "ignore_errors" (ignore errors/missing cost info)"""
     format_error_template: str = "{{ error }}"
@@ -66,7 +68,7 @@ class LitellmModel:
             return litellm.completion(
                 model=self.config.model_name,
                 messages=messages,
-                tools=[BASH_TOOL],
+                tools=[BASH_TOOL, *self.config.extra_tools],
                 **(self.config.model_kwargs | kwargs),
             )
         except litellm.exceptions.AuthenticationError as e:
@@ -132,6 +134,7 @@ class LitellmModel:
             tool_calls,
             format_error_template=self.config.format_error_template,
             template_kwargs={"finish_reason": response.choices[0].finish_reason},
+            tools=[BASH_TOOL, *self.config.extra_tools],
         )
 
     def format_message(self, **kwargs) -> dict:
