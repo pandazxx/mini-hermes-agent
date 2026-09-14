@@ -28,15 +28,22 @@ BASH_TOOL = {
 
 
 def parse_toolcall_actions(
-    tool_calls: list, *, format_error_template: str, template_kwargs: dict | None = None
+    tool_calls: list,
+    *,
+    format_error_template: str,
+    template_kwargs: dict | None = None,
+    tools: list[dict] | tuple[dict, ...] = (BASH_TOOL,),
 ) -> list[dict]:
     """Parse tool calls from the response. Raises FormatError if unknown tool or invalid args.
 
     ``template_kwargs`` are extra variables exposed to ``format_error_template`` (e.g.
     ``{"finish_reason": ...}`` so a template can distinguish a real format mistake from a
     ``max_tokens`` truncation).
+    ``tools`` are the tool definitions offered to the model; calls to any other tool are a
+    FormatError.
     """
     template_kwargs = template_kwargs or {}
+    schemas = {tool["function"]["name"]: tool["function"].get("parameters", {}) for tool in tools}
     if not tool_calls:
         raise FormatError(
             {
@@ -54,14 +61,17 @@ def parse_toolcall_actions(
     for tool_call in tool_calls:
         error_msg = ""
         args = {}
+        name = tool_call.function.name
         try:
             args = json.loads(tool_call.function.arguments)
         except Exception as e:
             error_msg = f"Error parsing tool call arguments: {e}."
-        if tool_call.function.name != "bash":
-            error_msg += f"Unknown tool '{tool_call.function.name}'."
-        if not isinstance(args, dict) or "command" not in args:
-            error_msg += "Missing 'command' argument in bash tool call."
+        if name not in schemas:
+            error_msg += f"Unknown tool '{name}'."
+        elif not isinstance(args, dict):
+            args = {}
+        if not error_msg and (missing := [p for p in schemas[name].get("required", []) if p not in args]):
+            error_msg += f"Missing {', '.join(repr(p) for p in missing)} argument in {name} tool call."
         if error_msg:
             raise FormatError(
                 {
@@ -72,7 +82,7 @@ def parse_toolcall_actions(
                     "extra": {"interrupt_type": "FormatError"},
                 }
             )
-        actions.append({"command": args["command"], "tool_call_id": tool_call.id})
+        actions.append({"name": name, **args, "tool_call_id": tool_call.id})
     return actions
 
 
