@@ -49,6 +49,7 @@ def _run_hermes(tool: str, work_model: str, task: str, output) -> dict:
             config_spec=[str(DEFAULT_CONFIG_FILE)],
             cost_limit=10.0,  # each DeterministicToolcallModel step reports cost=1.0; stay well clear of the limit
             output=output,
+            traceable_dir=output.parent / "traceable",
         )
 
 
